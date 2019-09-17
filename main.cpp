@@ -27,7 +27,7 @@ string hasData(string s) {
 
 int main() {
   uWS::Hub h;
- 
+
   // Set up parameters here
   double delta_t = 0.1;  // Time elapsed between measurements [sec]
   double sensor_range = 50;  // Sensor range [m]
@@ -62,14 +62,13 @@ int main() {
         string event = j[0].get<string>();
         
         if (event == "telemetry") {
-
           // j[1] is the data JSON object
           if (!pf.initialized()) {
             // Sense noisy position data from the simulator
             double sense_x = std::stod(j[1]["sense_x"].get<string>());
             double sense_y = std::stod(j[1]["sense_y"].get<string>());
             double sense_theta = std::stod(j[1]["sense_theta"].get<string>());
- 
+			std::cout << "particle initialized" << std::endl << std::flush;
             pf.init(sense_x, sense_y, sense_theta, sigma_pos);
           } else {
             // Predict the vehicle's next state from previous 
@@ -101,28 +100,26 @@ int main() {
           std::istream_iterator<float>(),
           std::back_inserter(y_sense));
 
-          for (unsigned int i = 0; i < x_sense.size(); ++i) {
+          for (int i = 0; i < x_sense.size(); ++i) {
             LandmarkObs obs;
             obs.x = x_sense[i];
             obs.y = y_sense[i];
             noisy_observations.push_back(obs);
           }
-          
+
           
           // Update the weights and resample
           pf.updateWeights(sensor_range, sigma_landmark, noisy_observations, map);
-                
           pf.resample();
-
 
           // Calculate and output the average weighted error of the particle 
           //   filter over all time steps so far.
           vector<Particle> particles = pf.particles;
-          unsigned int num_particles = particles.size();
+          int num_particles = particles.size();
           double highest_weight = -1.0;
           Particle best_particle;
           double weight_sum = 0.0;
-          for (unsigned int i = 0; i < num_particles; ++i) {
+          for (int i = 0; i < num_particles; ++i) {
             if (particles[i].weight > highest_weight) {
               highest_weight = particles[i].weight;
               best_particle = particles[i];
@@ -131,9 +128,8 @@ int main() {
             weight_sum += particles[i].weight;
           }
 
-          std::cout << "highest w " << highest_weight << std::endl << std::flush;
-          std::cout << "average w " << weight_sum/num_particles << std::endl <<std::flush;
-          
+          std::cout << "highest w " << highest_weight << std::endl;
+          std::cout << "average w " << weight_sum/num_particles << std::endl;
 
           json msgJson;
           msgJson["best_particle_x"] = best_particle.x;

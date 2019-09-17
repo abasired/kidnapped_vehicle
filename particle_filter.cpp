@@ -32,7 +32,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  num_particles = 5;  // TODO: Set the number of particles
+  num_particles = 100;  // TODO: Set the number of particles
   is_initialized = true;
   std::default_random_engine gen;
   
@@ -60,43 +60,26 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
                                 double velocity, double yaw_rate) {
-  /**
-   * TODO: Add measurements to each particle and add random Gaussian noise.
-   * NOTE: When adding noise you may find std::normal_distribution 
-   *   and std::default_random_engine useful.
-   *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
-   *  http://www.cplusplus.com/reference/random/default_random_engine/
-   */
-  
-  std::default_random_engine gen;
-  
-  for(int j=0; j<num_particles; j++){
-    
-     particles[j].theta += particles[j].theta + yaw_rate * delta_t;   
-    if (fabs(yaw_rate) < 0.001) {  
-      particles[j].x += velocity * delta_t * cos(particles[j].theta);
-      particles[j].y += velocity * delta_t * sin(particles[j].theta);
-    } else {
-     particles[j].x += (velocity/yaw_rate) * (sin(particles[j].theta+ yaw_rate * delta_t) - sin(particles[j].theta));  
-     particles[j].y += (velocity/yaw_rate) * (cos(particles[j].theta) - cos(particles[j].theta - yaw_rate * delta_t)); 
-     
-       }
-    
-    // Normal distibution with mean and variance. 
-     normal_distribution<double> dist_x(particles[j].x, std_pos[0]);   
-     normal_distribution<double> dist_y(particles[j].y, std_pos[1]);
-     normal_distribution<double> dist_theta(particles[j].theta, std_pos[2]); 
-    
-    // Picking a value from this distribution.
-     particles[j].x = dist_x(gen); 
-     particles[j].y = dist_y(gen);   
-     particles[j].theta = dist_theta(gen);
-    
-    std::cout << "particle x " << particles[j].x << std::endl << std::flush;
-    std::cout << "particle y " << particles[j].y << std::endl << std::flush;
-    std::cout << "particle theta " << particles[j].theta << std::endl << std::flush;
-    std::cout << "particle weight " << particles[j].weight << std::endl << std::flush;
-   }
+      std::random_device rd;
+    std::default_random_engine gen;
+
+    for (auto &p: particles){
+
+std::normal_distribution<double> dist_x(0, std_pos[0]); //Gaussian noise initializing based on estimates by sampling from Gaussian dist
+    std::normal_distribution<double> dist_y(0, std_pos[1]); //x,y,theta are values from GPS
+    std::normal_distribution<double> dist_theta(0, std_pos[2]);
+
+        if(fabs(yaw_rate) > 0.0001){
+            p.x += velocity/yaw_rate* (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) + dist_x(gen);
+            p.y += velocity/yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate* delta_t)) + dist_y(gen);
+        }
+        else{
+            p.x += velocity * delta_t *cos(p.theta) + dist_x(gen);
+            p.y += velocity * delta_t * sin(p.theta)+ dist_y(gen);
+        }
+        p.theta = p.theta + yaw_rate*delta_t + dist_theta(gen);
+    }
+
 }
 
 void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted, 
@@ -147,7 +130,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
  
   double distance;
-  double weight_normalizer;
+  double weight_normalizer = 0;
   double sig_x = std_landmark[0];
   double sig_y = std_landmark[1];
   double delta_y, delta_x;
@@ -181,7 +164,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       //x_map = x_part + (cos(theta) * x_obs) - (sin(theta) * y_obs);
         double x_obv = p_x + (cos(p_theta)*observations[j].x - sin(p_theta)*observations[j].y);
       //y_map = y_part + (sin(theta) * x_obs) + (cos(theta) * y_obs);
-        double y_obv = p_y + (sin(p_theta)*observations[j].x + cos(p_theta)*observations[j].x);
+        double y_obv = p_y + (sin(p_theta)*observations[j].x + cos(p_theta)*observations[j].y);
        new_map_coordinates.push_back(LandmarkObs{observations[j].id,x_obv, y_obv});
     }
     

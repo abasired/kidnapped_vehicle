@@ -1,0 +1,180 @@
+ashish R.
+
+12:30 PM
+
+Hello Levin
+
+
+More Options
+I have getting an error that particel weights are becoming zero in the kidnapped vehicle project
+
+I have tried lot of this. checked every small detail
+
+ashish R.
+
+1:05 PM
+
+the problem is that exp function is returning 0 value
+
+ashish R.
+
+1:17 PM
+
+I don't have any clue of what is going wrong here
+
+can you help
+
+ashish R.
+
+1:41 PM
+
+I tried to reset my workspace
+
+it is not booting back
+
+ashish R.
+
+3:44 PM
+
+https://github.com/abasired/kidnapped_vehicle/upload
+
+https://github.com/abasired/kidnapped_vehicle
+
+Levin J.
+
+Mentor
+
+6:17 PM
+
+Sure, Ashish, I will look into your codes, and get back to you.
+
+ashish R.
+
+6:49 PM
+
+also can you help use gdb in workspaces
+
+I tried to install gdb and run it
+
+but not able to set break point
+
+once I try to run
+
+ashish R.
+
+8:07 PM
+
+one issue I found was changing theta based on yaw rate
+
+incase you find naything else let me know
+
+anything
+
+AUGUST 7, 2019
+Levin J.
+
+Mentor
+
+10:44 PM
+
+Hi Ashish, sorry for the late reply.
+
+It looks there are multiple errors in the implementation.
+
+In the initiation step, you might want to have a higher number of particles like 100, also generate points around current position (currently there is a logic error in it). Something like below should be fine.
+
+void ParticleFilter::init(double x, double y, double theta, double std[]) {
+  /**
+   * TODO: Set the number of particles. Initialize all particles to 
+   *   first position (based on estimates of x, y, theta and their uncertainties
+   *   from GPS) and all weights to 1. 
+   * TODO: Add random Gaussian noise to each particle.
+   * NOTE: Consult particle_filter.h for more information about this method 
+   *   (and others in this file).
+   */
+  num_particles = 100;  // TODO: Set the number of particles
+  is_initialized = true;
+  std::default_random_engine gen;
+
+  // This line creates a normal (Gaussian) distribution for x,y,theta
+  normal_distribution<double> dist_x(0, std[0]);
+  normal_distribution<double> dist_y(0, std[1]);
+  normal_distribution<double> dist_theta(0, std[2]);
+
+ for(int j=0; j<num_particles; j++){
+     // Sample from these normal distributions like this: 
+    Particle p;
+    p.id = j;
+    p.x = x;
+    p.y = y;
+    p.theta = theta;
+    p.weight = 1.0;
+
+        p.x += dist_x(gen);
+     p.y += dist_y(gen);
+     p.theta += dist_theta(gen);
+
+    particles.push_back(p);
+   }
+}
+And then in the prediction step,
+
+there is at least one typo in it, it should be as below
+
+particles[j].y += (velocity/yaw_rate) * (cos(particles[j].theta) - cos(particles[j].theta + yaw_rate * delta_t)); 
+here shoudl be some other error(s) in this method, but I couldn't found it so far. it may be helpful for you to know that below implementation works
+
+void ParticleFilter::prediction(double delta_t, double std_pos[], 
+                                double velocity, double yaw_rate) {
+      std::random_device rd;
+    std::default_random_engine gen;
+
+
+
+    for (auto &p: particles){
+
+std::normal_distribution<double> dist_x(0, std_pos[0]); //Gaussian noise initializing based on estimates by sampling from Gaussian dist
+    std::normal_distribution<double> dist_y(0, std_pos[1]); //x,y,theta are values from GPS
+    std::normal_distribution<double> dist_theta(0, std_pos[2]);
+
+        if(fabs(yaw_rate) > 0.0001){
+            p.x += velocity/yaw_rate* (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) + dist_x(gen);
+            p.y += velocity/yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate* delta_t)) + dist_y(gen);
+        }
+        else{
+            p.x += velocity * delta_t *cos(p.theta) + dist_x(gen);
+            p.y += velocity * delta_t * sin(p.theta)+ dist_y(gen);
+        }
+        p.theta = p.theta + yaw_rate*delta_t + dist_theta(gen);
+    }
+
+}
+Maybe you can double check and compare the two , and see why yours fails.
+
+The general outline of ParticleFilter::updateWeights is correct, and I know for sure that there are some errors in it (by replacing with a good implementation). I will spend a bit more time and get back to you.
+
+Regardin gdb , you can set breakpoint by following below steps,
+
+In the CMakeLists.txt file, change add_definitions(-std=c++11) to add_definitions(-std=c++11 -g)
+Execute cmake .. && make under the build directory.
+Execute gdb ./ExtendedKF
+Execute b main
+Execute run
+at this point, you should see that the program pauses at main function entry.
+AUGUST 8, 2019
+Levin J.
+
+Mentor
+
+7:15 PM
+
+Hi Ashish, It turns out there is one typo in the weightUpdate method,
+
+double y_obv = p_y + (sin(p_theta)*observations[j].x + cos(p_theta)*observations[j].x);
+you might want to change it as below,
+
+double y_obv = p_y + (sin(p_theta)*observations[j].x + cos(p_theta)*observations[j].y);
+and another issue is that we need to initialize weight_normalizer, otherwise its value is undefined.
+
+double weight_normalizer=0;
+I was able to get your filter pass the test after fixing these two issues.

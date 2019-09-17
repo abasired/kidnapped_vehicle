@@ -13,7 +13,6 @@
 #include <vector>
 #include "helper_functions.h"
 
-
 struct Particle {
   int id;
   double x;
